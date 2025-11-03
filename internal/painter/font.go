@@ -219,14 +219,89 @@ func MeasureString(f shaping.Fontmap, s string, textSize float32, style fyne.Tex
 // RenderedTextSize looks up how big a string would be if drawn on screen.
 // It also returns the distance from top to the text baseline.
 func RenderedTextSize(text string, fontSize float32, style fyne.TextStyle, source fyne.Resource) (size fyne.Size, baseline float32) {
-	size, base := cache.GetFontMetrics(text, fontSize, style, source)
+	key := generateTextCacheKey(text)
+	size, base := cache.GetFontMetrics(key, fontSize, style, source)
 	if base != 0 {
+		// println("[DEBUG] Cache Hit:[" + key + "]:" + text)
 		return size, base
 	}
 
+	// println("[DEBUG] Cache Missed:[" + key + "]:" + text)
+
 	size, base = measureText(text, fontSize, style, source)
-	cache.SetFontMetrics(text, fontSize, style, source, size, base)
+	cache.SetFontMetrics(key, fontSize, style, source, size, base)
 	return size, base
+}
+
+func generateTextCacheKey(text string) string {
+	const digitRune = '#'
+	counts := make(map[rune]int)
+	digitCount := 0
+
+	for _, r := range text {
+		if r >= '0' && r <= '9' {
+			digitCount++
+		} else {
+			counts[r]++
+		}
+	}
+
+	// Collect runes
+	runes := make([]rune, 0, len(counts))
+	for r := range counts {
+		runes = append(runes, r)
+	}
+
+	// Manual insertion sort
+	for i := 1; i < len(runes); i++ {
+		j := i
+		for j > 0 && runes[j-1] > runes[j] {
+			runes[j-1], runes[j] = runes[j], runes[j-1]
+			j--
+		}
+	}
+
+	// Build key
+	buf := make([]byte, 0, len(text)*2)
+	for _, r := range runes {
+		// Escape special characters
+		switch r {
+		case ' ':
+			buf = append(buf, '\\', 's')
+		case '\n':
+			buf = append(buf, '\\', 'n')
+		case '\t':
+			buf = append(buf, '\\', 't')
+		default:
+			if r < 32 || r == 127 {
+				// Encode as \uXXXX manually
+				buf = append(buf, '\\', 'u')
+				hex := encodeHex(uint16(r))
+				buf = append(buf, hex[:]...)
+			} else {
+				buf = append(buf, string(r)...)
+			}
+		}
+		// Append count (single digit only)
+		buf = append(buf, byte('0'+counts[r]))
+	}
+
+	if digitCount > 0 {
+		buf = append(buf, digitRune)
+		buf = append(buf, byte('0'+digitCount))
+	}
+
+	return string(buf)
+}
+
+func encodeHex(val uint16) [4]byte {
+	const hexChars = "0123456789abcdef"
+	return [4]byte{
+		hexChars[(val>>12)&0xF],
+		hexChars[(val>>8)&0xF],
+		hexChars[(val>>4)&0xF],
+		hexChars[val&0xF],
+	}
 }
 
 func fixed266ToFloat32(i fixed.Int26_6) float32 {
