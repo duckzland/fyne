@@ -1,5 +1,4 @@
 //go:build !no_fonts
-// +build !no_fonts
 
 package theme
 
