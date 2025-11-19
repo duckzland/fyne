@@ -219,6 +219,11 @@ func DrawStringOffset(dst draw.Image, s string, color color.Color, f shaping.Fon
 }
 
 func loadMeasureFont(data fyne.Resource) *font.Face {
+	d := data.Content()
+	if d == nil || len(d) == 0 {
+		return nil
+	}
+
 	loaded, err := font.ParseTTF(bytes.NewReader(data.Content()))
 	if err != nil {
 		fyne.LogError("font load error", err)
