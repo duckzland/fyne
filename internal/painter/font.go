@@ -239,6 +239,10 @@ func RenderedTextSize(text string, fontSize float32, style fyne.TextStyle, sourc
 }
 
 func generateTextCacheKey(text string) string {
+	if len(text) < 2 {
+		return text
+	}
+
 	const digitRune = '#'
 	counts := make(map[rune]int)
 	digitCount := 0
